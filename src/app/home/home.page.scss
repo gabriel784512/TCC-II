@@ -1,4 +1,32 @@
-.welcome-card img {
-  max-height: 35vh;
-  overflow: hidden;
+.pesquisa { 
+  text-align: center;
+  height:100%;
+  width:100%; 
+  box-shadow: inset -10px -10px 30px rgb(157, 191, 255), inset 10px 10px 30px rgb(157, 191, 255);
+  display: inline-block;
+  background-color: rgba(186, 206, 226, 0.89);
+}
+
+.pesquisa ion-icon {
+  height:50%;
+  width:50%; 
+  color: #FFF; 
+}
+
+.pesquisa button {
+  display: inline-block;
+  margin-top: 50%;
+  height:300px;
+  width:300px;
+  border-radius: 50%;
+  outline: none;
+  border: none;
+  background-color: #3880ff;
+  box-shadow: 0 9px #999;
+}
+
+.pesquisa button:active {
+  background-color: #002970;
+  box-shadow: 0 5px #666;
+  transform: translateY(4px);
 }
