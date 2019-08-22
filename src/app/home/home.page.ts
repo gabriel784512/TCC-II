@@ -1,4 +1,5 @@
 import { Component } from '@angular/core';
+import { LoadingController } from '@ionic/angular';
 import { SpeechRecognition } from '@ionic-native/speech-recognition/ngx';
 import { ScreenOrientation } from '@ionic-native/screen-orientation/ngx';
 import { StatusBar } from '@ionic-native/status-bar/ngx';
@@ -10,10 +11,14 @@ import { TextToSpeech } from '@ionic-native/text-to-speech/ngx';
   styleUrls: ['home.page.scss'],
 })
 export class HomePage {
-  matches: Array<String>;
+  public textoTraduzido: string = "";
 
-  constructor(private speechRecognition: SpeechRecognition, private screenOrientation: ScreenOrientation, private statusBar: StatusBar, private tts: TextToSpeech) {
+  constructor(private speechRecognition: SpeechRecognition, private screenOrientation: ScreenOrientation, private statusBar: StatusBar, private tts: TextToSpeech, public loadingController: LoadingController) {
   }
+  /** Converter o texto recebido em fala
+  * @param {_text}
+  * @param {_time}
+  */
 
   ngOnInit(){
 
@@ -37,6 +42,11 @@ export class HomePage {
     });
   }
 
+  /** COISAS A SER FEITA NO MOMENTO: 
+   *  1-Quando clicar no botão, fazer com que o aplicativo pergunte o produto que ele deseja saber antes de ouvir o que a pessoa falar...
+   *  2-Após informar o produto, fazer com que o aplicativo fale para o cliente que esta localizando o produto e se encontrado dizer se achou ou não...
+  */
+
   startVoz(){
     let options = {
       language: 'pt-BR',
@@ -44,22 +54,54 @@ export class HomePage {
       prompt: 'Estou te ouvindo! :)',  
       showPopup: true,                
     }
+
     // Processo de reconhecimento de voz
     this.speechRecognition.startListening(options).subscribe(matches => {
-      this.matches = matches,      
-      (onerror) => console.log('error:', onerror)
+      if(matches && matches.length > 0){
+        this.textoTraduzido = matches[0]
+        this.localizarProd(this.textoTraduzido)
+        this.playVoz(this.textoTraduzido);
+      }
+    },(onerror) => {
+      console.log('error:', onerror);    
     })
   }
 
-  playVoz(){
-    // Processo de tocar voz
+  playVoz(_text){
+    // Processo de falar
     this.tts.speak({
-      text : this.matches.toString(),
+      text : _text,
       locale: 'pt-BR',
       rate: 1
-    }).then(() => console.log('Success'))
-    .catch((reason: any) => console.log(reason));
+    }).then(() => {
+      console.log('Successo!!');
+    })
+    .catch((reason: any) => {
+      console.log(reason);
+    })
   }
+
+  localizarProd(_text){
+    if(_text == "uva"){      
+      this.textoTraduzido = "Produto encontrado!";
+    }else{
+      this.textoTraduzido = "Produto não encontrado!";
+    }
+  }
+
+  async controlerCarregamento(_text, _time) {
+    const loading = await this.loadingController.create({
+      spinner: "lines",
+      duration: _time,
+      message: _text,
+      cssClass: 'custom-class custom-loading'
+    });
+    
+    await loading.present();
+    await loading.onDidDismiss();
+    return console.log('Sucesso!');
+  }
+
 
 }
 
