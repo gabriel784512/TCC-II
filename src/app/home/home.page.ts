@@ -4,6 +4,7 @@ import { SpeechRecognition } from '@ionic-native/speech-recognition/ngx';
 import { ScreenOrientation } from '@ionic-native/screen-orientation/ngx';
 import { StatusBar } from '@ionic-native/status-bar/ngx';
 import { TextToSpeech } from '@ionic-native/text-to-speech/ngx';
+import { Vibration } from '@ionic-native/vibration/ngx';
 
 @Component({
   selector: 'app-home',
@@ -13,19 +14,20 @@ import { TextToSpeech } from '@ionic-native/text-to-speech/ngx';
 export class HomePage {
   public textoTraduzido: string = "";
 
-  constructor(private speechRecognition: SpeechRecognition, private screenOrientation: ScreenOrientation, private statusBar: StatusBar, private tts: TextToSpeech, public loadingController: LoadingController) {
+  constructor(private speechRecognition: SpeechRecognition, private screenOrientation: ScreenOrientation, private statusBar: StatusBar, 
+              private tts: TextToSpeech, public loadingController: LoadingController, private vibration: Vibration) {
   }
-  /** Converter o texto recebido em fala
+  /**
   * @param {_text}
   * @param {_time}
   */
 
   ngOnInit(){
 
-    // Definindo modo retrato
+    // Definindo sempre modo retrato
     this.screenOrientation.lock(this.screenOrientation.ORIENTATIONS.PORTRAIT);
 
-    // Deixa o texto claro no statusBar
+    // Deixa claro o statusBar do celular
     this.statusBar.styleBlackOpaque();
 
     // Verificando a permissao de voz
@@ -43,9 +45,15 @@ export class HomePage {
   }
 
   /** COISAS A SER FEITA NO MOMENTO: 
-   *  1-Quando clicar no botão, fazer com que o aplicativo pergunte o produto que ele deseja saber antes de ouvir o que a pessoa falar...
-   *  2-Após informar o produto, fazer com que o aplicativo fale para o cliente que esta localizando o produto e se encontrado dizer se achou ou não...
+   *  "OK" -> 1-Quando clicar no botão, fazer com que o aplicativo pergunte o produto que ele deseja saber antes de ouvir o que a pessoa falar... 
+   *  "OK POR ENQUANTO" >- 2-Após informar o produto, fazer com que o aplicativo fale para o cliente que esta localizando o produto e se encontrado dizer se achou ou não... 
   */
+
+  PesquisaProd(){
+    this.playVoz('Por favor informe o produto que deseja encontrar!');
+    this.controlerCarregamento('Aguarde...', 3000);
+    setTimeout(() => { this.startVoz() }, 3050);
+  }
 
   startVoz(){
     let options = {
@@ -54,13 +62,14 @@ export class HomePage {
       prompt: 'Estou te ouvindo! :)',  
       showPopup: true,                
     }
-
+    
     // Processo de reconhecimento de voz
     this.speechRecognition.startListening(options).subscribe(matches => {
       if(matches && matches.length > 0){
         this.textoTraduzido = matches[0]
-        this.localizarProd(this.textoTraduzido)
-        this.playVoz(this.textoTraduzido);
+        this.playVoz('Aguarde, localizando produto!')
+        this.controlerCarregamento('Aguarde...', 3000)
+        setTimeout(() => { this.localizarProd(this.textoTraduzido) }, 3050)                
       }
     },(onerror) => {
       console.log('error:', onerror);    
@@ -82,10 +91,12 @@ export class HomePage {
   }
 
   localizarProd(_text){
-    if(_text == "uva"){      
-      this.textoTraduzido = "Produto encontrado!";
+    if(_text == "uva"){ 
+      this.vibration.vibrate(1000);           
+      this.playVoz('Produto encontrado!');
     }else{
-      this.textoTraduzido = "Produto não encontrado!";
+      this.vibration.vibrate(1000);           
+      this.playVoz('Produto não encontrado!');         
     }
   }
 
@@ -101,7 +112,5 @@ export class HomePage {
     await loading.onDidDismiss();
     return console.log('Sucesso!');
   }
-
-
 }
 

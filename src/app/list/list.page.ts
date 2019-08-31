@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { Vibration } from '@ionic-native/vibration/ngx';
 
 @Component({
   selector: 'app-list',
@@ -6,27 +7,28 @@ import { Component, OnInit } from '@angular/core';
   styleUrls: ['list.page.scss']
 })
 export class ListPage implements OnInit {
-  private selectedItem: any;
+  /*private selectedItem: any;
   private icons = [
-    'flask',
-    'wifi',
-    'beer',
-    'football',
-    'basketball',
-    'paper-plane',
-    'american-football',
-    'boat',
-    'bluetooth',
-    'build'
-  ];
-  public items: Array<{ title: string; note: string; icon: string }> = [];
-  constructor() {
-    for (let i = 1; i < 11; i++) {
+    'notifications',
+    'volume-high'
+  ];*/
+  //public items: Array<{ title: string; note: string; icon: string }> = [];
+  public Click:boolean = true;
+  constructor(private vibration: Vibration) {
+    /*for (let i = 1; i <= 11; i++) {
       this.items.push({
         title: 'Item ' + i,
         note: 'This is item #' + i,
         icon: this.icons[Math.floor(Math.random() * this.icons.length)]
       });
+    }*/
+  }
+
+  vibrate(){
+    if(this.Click){
+      this.vibration.vibrate(1000);
+      setInterval(() => {console.log(this.Click)},3000);
+      
     }
   }
 

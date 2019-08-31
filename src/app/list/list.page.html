@@ -1,27 +1,43 @@
 <ion-header>
-  <ion-toolbar>
+  <ion-toolbar color="primary">
     <ion-buttons slot="start">
       <ion-menu-button></ion-menu-button>
     </ion-buttons>
     <ion-title>
-      List
+      Volume e Vibração
     </ion-title>
   </ion-toolbar>
 </ion-header>
 
 <ion-content>
-  <ion-list>
-    <ion-item *ngFor="let item of items">
-      <ion-icon [name]="item.icon" slot="start"></ion-icon>
-      {{item.title}}
-      <div class="item-note" slot="end">
-        {{item.note}}
-      </div>
-    </ion-item>
-  </ion-list>
+  <div class="config">
   <!--
-    <div *ngIf="selectedItem" padding>
-      You navigated here from <b>{{selectedItem.title }}</b>
-    </div>
+    <ion-list>
+      <ion-item *ngFor="let item of items">
+        <ion-icon [name]="item.icon" slot="start"></ion-icon>
+        {{item.title}}
+        <div class="item-note" slot="end">
+          {{item.note}}
+        </div>
+      </ion-item>
+    </ion-list>
   -->
+    <ion-list>
+      <ion-label>Vibração do Aplicativo</ion-label>
+      <ion-item>
+        <ion-label>Na localização do produto</ion-label>
+        <ion-toggle slot="end" value="vibracao" (ionChange)="vibrate()" [(ngModel)]="Click"></ion-toggle>
+        <ion-icon  slot="start" name="notifications"></ion-icon>
+      </ion-item>
+    </ion-list>
+
+    <ion-list>
+      <ion-label>Volume do Aplicativo</ion-label>
+      <ion-item>
+        <ion-range color="primary" pin="true"></ion-range>
+        <ion-icon  slot="start" name="volume-high"></ion-icon>
+      </ion-item>
+    </ion-list>
+  </div>
 </ion-content>
+
