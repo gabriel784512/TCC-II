@@ -17,9 +17,9 @@ export class AppComponent {
       icon: 'home'
     },
     {
-      title: 'List',
+      title: 'Volume e Vibração',
       url: '/list',
-      icon: 'list'
+      icon: 'md-musical-notes'
     }
   ];
 
