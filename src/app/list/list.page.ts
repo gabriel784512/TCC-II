@@ -27,7 +27,7 @@ export class ListPage implements OnInit {
   vibrate(){
     if(this.Click){
       this.vibration.vibrate(1000);
-      setInterval(() => {console.log(this.Click)},3000);
+      setTimeout(() => {console.log(this.Click)},3000);
       
     }
   }
