@@ -14,6 +14,7 @@ import { AndroidPermissions } from '@ionic-native/android-permissions/ngx';
 import { Geolocation } from '@ionic-native/geolocation/ngx';
 import { LocationAccuracy } from '@ionic-native/location-accuracy/ngx';
 import { SQLite } from '@ionic-native/sqlite/ngx';
+import { Network } from '@ionic-native/network/ngx';
 
 @NgModule({
   declarations: [AppComponent],
@@ -34,7 +35,8 @@ import { SQLite } from '@ionic-native/sqlite/ngx';
     LocationAccuracy,
     SQLite,
     { provide: RouteReuseStrategy, useClass: IonicRouteStrategy },
-    ScreenOrientation
+    ScreenOrientation,
+    Network
   ],
   bootstrap: [AppComponent]
 })

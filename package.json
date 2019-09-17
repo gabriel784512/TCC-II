@@ -25,6 +25,7 @@
     "@ionic-native/core": "^5.0.0",
     "@ionic-native/geolocation": "^5.13.0",
     "@ionic-native/location-accuracy": "^5.13.0",
+    "@ionic-native/network": "^5.14.0",
     "@ionic-native/screen-orientation": "^5.12.0",
     "@ionic-native/speech-recognition": "^5.12.0",
     "@ionic-native/splash-screen": "^5.0.0",
@@ -37,6 +38,7 @@
     "cordova-plugin-android-permissions": "^1.0.0",
     "cordova-plugin-fullscreen": "^1.2.0",
     "cordova-plugin-geolocation": "^4.0.2",
+    "cordova-plugin-network-information": "^2.0.2",
     "cordova-plugin-request-location-accuracy": "^2.3.0",
     "cordova-plugin-screen-orientation": "^3.0.2",
     "cordova-plugin-speechrecognition": "^1.2.0",
@@ -101,7 +103,8 @@
         "PLAY_SERVICES_LOCATION_VERSION": "16.+"
       },
       "cordova-plugin-geolocation": {},
-      "cordova-sqlite-storage": {}
+      "cordova-sqlite-storage": {},
+      "cordova-plugin-network-information": {}
     },
     "platforms": [
       "android"

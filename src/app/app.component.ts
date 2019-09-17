@@ -29,12 +29,19 @@ export class AppComponent {
     private statusBar: StatusBar
   ) {
     this.initializeApp();
+    this.botaoVoltar();
   }
 
   initializeApp() {
     this.platform.ready().then(() => {
       this.statusBar.styleDefault();
       this.splashScreen.hide();
+    });
+  }
+
+  botaoVoltar() {
+    this.platform.backButton.subscribe(async () => {      
+      navigator['app'].exitApp();
     });
   }
 }

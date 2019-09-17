@@ -9,6 +9,7 @@ import { AndroidPermissions } from '@ionic-native/android-permissions/ngx';
 import { Geolocation } from '@ionic-native/geolocation/ngx';
 import { LocationAccuracy } from '@ionic-native/location-accuracy/ngx';
 import { SQLite, SQLiteObject } from '@ionic-native/sqlite/ngx';
+import { Network } from '@ionic-native/network/ngx';
 
 @Component({
   selector: 'app-home',
@@ -28,11 +29,18 @@ export class HomePage {
 
   constructor(private speechRecognition: SpeechRecognition, private screenOrientation: ScreenOrientation, private statusBar: StatusBar, 
               private tts: TextToSpeech, public loadingController: LoadingController, private vibration: Vibration, private androidPermissions: AndroidPermissions,
-              private geolocation: Geolocation, private locationAccuracy: LocationAccuracy, private sqlite: SQLite) {
+              private geolocation: Geolocation, private locationAccuracy: LocationAccuracy, private sqlite: SQLite, private network: Network) {
     this.locationCoords = {
       latitude: "",
       longitude: ""
     }
+    this.network.onDisconnect().subscribe(() => {
+      this.playVoz('Por favor verifique sua conexão com a internet!');
+    });    
+    /*
+    this.network.onConnect().subscribe(() => {
+      this.playVoz('Conexão com a internet restabelecida!');
+    });*/
   }
 
   /**
@@ -50,19 +58,27 @@ export class HomePage {
   * @param {_peso}
   * @param {_latitude}
   * @param {_longitude}
+  * @param {_opcao}
   */
 
   ngOnInit(){
     // Definindo sempre modo retrato
-    /*this.screenOrientation.lock(this.screenOrientation.ORIENTATIONS.PORTRAIT);
+    this.screenOrientation.lock(this.screenOrientation.ORIENTATIONS.PORTRAIT);
 
     // Deixa claro o statusBar do celular
     this.statusBar.styleBlackOpaque();
 
-    this.checkVozPermission();
-    setTimeout(() => { this.checkGPSPermission() }, 4000);
+    this.initializeNetworkEvents()
+  }
 
-    this.createDB();*/
+  initializeNetworkEvents(){
+    if (this.network.type == 'none'){
+      this.playVoz('Por favor verifique sua conexão com a internet!');
+    }else{
+      this.checkVozPermission();
+      setTimeout(() => { this.checkGPSPermission() }, 4000);
+      this.createDB();
+    }
   }
 
   checkVozPermission(){
@@ -81,19 +97,21 @@ export class HomePage {
     .then(result =>{
       if (result.hasPermission){
         //Se tiver permissão, mostre a caixa de diálogo "Ativar GPS"
-        this.askToTurnOnGPS();
-      } else{
+        this.askToTurnOnGPS(1);
+      }else{
         //Se não tiver permissão, peça permissão
         this.requestGPSPermission();
       }
     });
   }
 
-  askToTurnOnGPS(){    
+  askToTurnOnGPS(_opcao){    
     this.locationAccuracy.request(this.locationAccuracy.REQUEST_PRIORITY_HIGH_ACCURACY)
     .then(() => {
-      // Quando o GPS ativar o método de chamada vai obter as coordenadas da localização precisa do celular               
-      this.getLocationCoordinates();  
+      // Quando o GPS ativar o método de chamada vai obter as coordenadas da localização precisa do celular  
+      if(_opcao == 2){
+        this.getLocationCoordinates(); 
+      }                    
     }).catch(() => {         
       this.playVoz('Erro ao solicitar permissão de localização!');
     });
@@ -104,12 +122,12 @@ export class HomePage {
     .then((canRequest: boolean) => {
       if (canRequest){
         console.log("Sucesso Permissao GPS!");
-      } else{
+      }else{
         //Mostrar o diálogo 'Solicitação de permissão GPS'
         this.androidPermissions.requestPermission(this.androidPermissions.PERMISSION.ACCESS_COARSE_LOCATION)
         .then(() => {
           //Método de chamada para ativar o GPS
-          this.askToTurnOnGPS();          
+          this.askToTurnOnGPS(1);          
         })
       }
     });
@@ -120,16 +138,23 @@ export class HomePage {
     this.geolocation.getCurrentPosition()
     .then((resp) => {
       this.locationCoords.latitude = resp.coords.latitude;
-      this.locationCoords.longitude = resp.coords.longitude;      
+      this.locationCoords.longitude = resp.coords.longitude;  
+      
+      this.playVoz('Por favor informe o produto que deseja encontrar!');
+      this.controlerCarregamento('Por favor informe o produto que deseja encontrar...', 3000);
+      setTimeout(() => { this.startVoz() }, 3050);
+      
     }).catch(() => {
       this.playVoz('Erro ao obter a localização!');            
     });
   }
 
-  PesquisaProd(){             
-    this.playVoz('Por favor informe o produto que deseja encontrar!');
-    this.controlerCarregamento('Aguarde...', 3000);
-    setTimeout(() => { this.startVoz() }, 3050);
+  PesquisaProd(){  
+    if (this.network.type != 'none'){  
+      this.askToTurnOnGPS(2);
+    }else{
+      this.playVoz('Não será possível consultar o produto, pois não possui conexão com a internet!');
+    }
   }
 
   startVoz(){
@@ -144,8 +169,8 @@ export class HomePage {
     this.speechRecognition.startListening(options).subscribe(matches => {
       if(matches && matches.length > 0){
         this.textoTraduzido = matches[0]
-        this.playVoz('Aguarde, encontrando produto!')
-        this.controlerCarregamento('Aguarde...', 3000)
+        this.playVoz('Aguarde, localizando produto!')
+        this.controlerCarregamento('Aguarde, encontrando produto...', 3000)
         setTimeout(() => { this.getRows(this.textoTraduzido) }, 3050)                 
       }
     },(onerror) => {
@@ -188,7 +213,7 @@ export class HomePage {
     _lat2 *= deg2rad;
     _lon2 *= deg2rad;
 
-    var diam = 12742; // Diâmetro da terra em km (2 * 6371)
+    var diam = 12742; // Diâmetro da terra em km
     var dLat = _lat2 - _lat1;
     var dLon = _lon2 - _lon1;
     var a = ((1 - cos(dLat)) + 
@@ -238,13 +263,13 @@ export class HomePage {
       this.row_data = [];
       if (res.rows.item(0).qtd == 0) {
         this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '1', 'Uva Verde', 'Doce Mel', '2020-10-20', 7.49, '500 gramas', '-10.882311', '-61.968192'])
-        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '2', 'Feijão Preto', 'Carioca', '2021-08-10', 8.99, '1 quilo', '-10.882311', '-61.968192'])
-        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '3', 'Arroz Integral', 'Tio Urbano', '2022-03-02', 14.39, '5 quilos', '-10.882311', '-61.968192'])
+        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '2', 'Feijão Preto', 'Carioca', '2021-08-10', 8.99, '1 quilo', '-10.719771', '-62.248611'])
+        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '3', 'Arroz Integral', 'Tio Urbano', '2022-03-02', 14.39, '5 quilos', '-10.719771', '-62.248611'])
         this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '4', 'Leite Integral', 'Italac', '2019-12-04', 2.59, '1 litro', '-10.882311', '-61.968192'])
         this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '5', 'Café Tradicional', 'Três Corações', '2021-06-30', 7.99, '500 gramas', '-10.882311', '-61.968192'])
         this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '6', 'Trigo Tradicional', 'Dona Benta', '2022-11-25', 8.99, '1 quilo', '-10.882311', '-61.968192'])
         .then(() => {          
-          console.log('Registro inseridos!');
+          console.log('Registros inseridos!');
         }).catch(e => {
           console.log("error inserir registros " + JSON.stringify(e))
         });
@@ -266,6 +291,7 @@ export class HomePage {
       } else{
         this.vibration.vibrate(1000);           
         this.playVoz('Produto não encontrado!');
+        this.controlerCarregamento('Produto não encontrado...', 2000)
       }
     }).catch(()=> {      
       this.playVoz("Erro ao realizar consulta do produto!")
@@ -275,8 +301,8 @@ export class HomePage {
   localizarProd(_nomeProd, _marca, _dataValid, _preco, _peso, _latitude, _longitude){
     this.vibration.vibrate(1000);    
 
-    this.controlerCarregamento('Produto encontrado...', 6000); 
-    this.playVoz('Produto encontrado, o produto se localiza, cerca de:' + this.calculaDistancia(this.locationCoords.latitude, this.locationCoords.longitude, _latitude, _longitude) + ' metros de distância!');
+    this.controlerCarregamento('Produto encontrado, o produto se localiza, cerca de ' + this.calculaDistancia(this.locationCoords.latitude, this.locationCoords.longitude, _latitude, _longitude) + ' metros de distância...', 6000); 
+    this.playVoz('Produto encontrado, o produto se localiza, cerca de: ' + this.calculaDistancia(this.locationCoords.latitude, this.locationCoords.longitude, _latitude, _longitude) + ' metros de distância!');
 
     setTimeout(() => { this.controlerCarregamento('Informações do produto...', 15000) }, 6500);
     setTimeout(() => { 
