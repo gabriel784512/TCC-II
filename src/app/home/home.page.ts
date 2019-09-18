@@ -43,6 +43,7 @@ export class HomePage {
     });*/
   }
 
+
   /**
   * @param {_text}
   * @param {_time}
@@ -153,7 +154,7 @@ export class HomePage {
     if (this.network.type != 'none'){  
       this.askToTurnOnGPS(2);
     }else{
-      this.playVoz('Não será possível consultar o produto, pois não possui conexão com a internet!');
+      this.playVoz('Não será possível kkkkkkkk consultar o produto, pois não possui conexão com a internet!');
     }
   }
 
