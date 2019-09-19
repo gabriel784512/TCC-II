@@ -18,14 +18,13 @@ import { Network } from '@ionic-native/network/ngx';
 })
 export class HomePage {
   
-  textoTraduzido: string = "";
-  distancia: string = "";
-  name_model: string = ""; 
-  readonly database_name: string = "TCC.db"; 
-  readonly table_name: string = "produtos"; 
-  locationCoords: any;
-  row_data: any = []; 
-  databaseObj: SQLiteObject; 
+  private textoTraduzido: string = "";
+  private distancia: string = "";  
+  private readonly database_name: string = "TCC.db"; 
+  private readonly table_name: string = "produtos"; 
+  private locationCoords: any;
+  public row_data: any = []; 
+  private databaseObj: SQLiteObject; 
 
   constructor(private speechRecognition: SpeechRecognition, private screenOrientation: ScreenOrientation, private statusBar: StatusBar, 
               private tts: TextToSpeech, public loadingController: LoadingController, private vibration: Vibration, private androidPermissions: AndroidPermissions,
@@ -37,12 +36,7 @@ export class HomePage {
     this.network.onDisconnect().subscribe(() => {
       this.playVoz('Por favor verifique sua conexão com a internet!');
     });    
-    /*
-    this.network.onConnect().subscribe(() => {
-      this.playVoz('Conexão com a internet restabelecida!');
-    });*/
   }
-
 
   /**
   * @param {_text}
@@ -69,20 +63,17 @@ export class HomePage {
     // Deixa claro o statusBar do celular
     this.statusBar.styleBlackOpaque();
 
-    this.initializeNetworkEvents()
+    // Verificando permissao para microfone do celular
+    this.checkVozPermission();
+
+    // Verificando permissao para GPS
+    setTimeout(() => { this.checkGPSPermission() }, 4000);
+
+    // Criando base de dados
+    this.createDB();
   }
 
-  initializeNetworkEvents(){
-    if (this.network.type == 'none'){
-      this.playVoz('Por favor verifique sua conexão com a internet!');
-    }else{
-      this.checkVozPermission();
-      setTimeout(() => { this.checkGPSPermission() }, 4000);
-      this.createDB();
-    }
-  }
-
-  checkVozPermission(){
+  private checkVozPermission(){
     // Verificando a permissao de voz e solicita permissao
     this.speechRecognition.hasPermission()
     .then((hasPermission: boolean) => {
@@ -92,7 +83,7 @@ export class HomePage {
     });
   }
 
-  checkGPSPermission(){
+  private checkGPSPermission(){
     // Verifique se o aplicativo tem permissão de acesso GPS
     this.androidPermissions.checkPermission(this.androidPermissions.PERMISSION.ACCESS_COARSE_LOCATION)
     .then(result =>{
@@ -106,11 +97,11 @@ export class HomePage {
     });
   }
 
-  askToTurnOnGPS(_opcao){    
+  private askToTurnOnGPS(_opcao: number){    
     this.locationAccuracy.request(this.locationAccuracy.REQUEST_PRIORITY_HIGH_ACCURACY)
     .then(() => {
       // Quando o GPS ativar o método de chamada vai obter as coordenadas da localização precisa do celular  
-      if(_opcao == 2){
+      if (_opcao == 2){
         this.getLocationCoordinates(); 
       }                    
     }).catch(() => {         
@@ -118,7 +109,7 @@ export class HomePage {
     });
   }
 
-  requestGPSPermission(){
+  private requestGPSPermission(){
     this.locationAccuracy.canRequest()
     .then((canRequest: boolean) => {
       if (canRequest){
@@ -135,8 +126,10 @@ export class HomePage {
   }
 
   // Metodo para obter coordenadas precisas do dispositivo usando o GPS do dispositivo
-  getLocationCoordinates(){
-    this.geolocation.getCurrentPosition()
+  private getLocationCoordinates(){
+    this.geolocation.getCurrentPosition({
+      enableHighAccuracy: true
+    })
     .then((resp) => {
       this.locationCoords.latitude = resp.coords.latitude;
       this.locationCoords.longitude = resp.coords.longitude;  
@@ -150,15 +143,15 @@ export class HomePage {
     });
   }
 
-  PesquisaProd(){  
+  public PesquisaProd(){  
     if (this.network.type != 'none'){  
       this.askToTurnOnGPS(2);
     }else{
-      this.playVoz('Não será possível kkkkkkkk consultar o produto, pois não possui conexão com a internet!');
+      this.playVoz('Não será possível consultar o produto, pois não possui conexão com a internet!');
     }
   }
 
-  startVoz(){
+  private startVoz(){
     // Processo de reconhecimento de voz
     let options = {
       language: 'pt-BR',
@@ -168,18 +161,18 @@ export class HomePage {
     }
     
     this.speechRecognition.startListening(options).subscribe(matches => {
-      if(matches && matches.length > 0){
+      if (matches && matches.length > 0){
         this.textoTraduzido = matches[0]
         this.playVoz('Aguarde, localizando produto!')
         this.controlerCarregamento('Aguarde, encontrando produto...', 3000)
-        setTimeout(() => { this.getRows(this.textoTraduzido) }, 3050)                 
+        setTimeout(() => { this.getRows( this.textoTraduzido ) }, 3050)                 
       }
     },(onerror) => {
       console.log('error:', onerror);    
     })
   }
 
-  playVoz(_text){
+  private playVoz(_text: string){
     // Processo de falar
     this.tts.speak({
       text : _text,
@@ -192,7 +185,7 @@ export class HomePage {
     })
   }
 
-  async controlerCarregamento(_text, _time) {
+  private async controlerCarregamento(_text: string, _time: number) {
     const loading = await this.loadingController.create({
       spinner: "lines",
       duration: _time,
@@ -205,7 +198,7 @@ export class HomePage {
     return console.log('Sucesso!');
   }
 
-  calculaDistancia(_lat1, _lon1, _lat2, _lon2){
+  private calculaDistancia(_lat1: number, _lon1: number, _lat2: number, _lon2: number){
     var deg2rad = 0.017453292519943295; // Math.PI / 180
     var cos = Math.cos;
 
@@ -225,7 +218,7 @@ export class HomePage {
     return this.distancia;
   }
 
-  createDB(){
+  private createDB(){
     this.sqlite.create({
       name: this.database_name,
       location: 'default'
@@ -239,7 +232,7 @@ export class HomePage {
     });
   }
 
-  createTable() {
+  private createTable() {
     this.databaseObj.executeSql('CREATE TABLE IF NOT EXISTS ' + this.table_name + ' '+
     '(id_produto INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, '+
     'cod_prod            TEXT NOT NULL, '+
@@ -258,7 +251,7 @@ export class HomePage {
     });
   }
   
-  insertRow(){  
+  private insertRow(){  
     this.databaseObj.executeSql("SELECT COUNT(*) AS qtd FROM " + this.table_name, []) 
     .then((res) => {
       this.row_data = [];
@@ -280,7 +273,7 @@ export class HomePage {
     });
   }
 
-  getRows(_produto){
+  private getRows(_produto: string){
     this.databaseObj.executeSql("SELECT nome_prod, marca_prod, data_validade_prod, REPLACE(preco_prod, '.', ' reais e ') || ' centavos' AS preco_prod, peso, latitude, longitude "+
                                 "FROM " + this.table_name + " WHERE (nome_prod LIKE ?)", ['%' + _produto + '%'])
     .then((res) => {      
@@ -289,7 +282,7 @@ export class HomePage {
         for (var i = 0; i < res.rows.length; i++) {                           
           this.localizarProd(res.rows.item(i).nome_prod, res.rows.item(i).marca_prod, res.rows.item(i).data_validade_prod, res.rows.item(i).preco_prod, res.rows.item(i).peso, res.rows.item(i).latitude, res.rows.item(i).longitude);
         }
-      } else{
+      }else{
         this.vibration.vibrate(1000);           
         this.playVoz('Produto não encontrado!');
         this.controlerCarregamento('Produto não encontrado...', 2000)
@@ -299,7 +292,7 @@ export class HomePage {
     });
   }
  
-  localizarProd(_nomeProd, _marca, _dataValid, _preco, _peso, _latitude, _longitude){
+  private localizarProd(_nomeProd: string, _marca: string, _dataValid: Date, _preco: string, _peso: string, _latitude: number, _longitude: number){
     this.vibration.vibrate(1000);    
 
     this.controlerCarregamento('Produto encontrado, o produto se localiza, cerca de ' + this.calculaDistancia(this.locationCoords.latitude, this.locationCoords.longitude, _latitude, _longitude) + ' metros de distância...', 6000); 
