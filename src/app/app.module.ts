@@ -15,6 +15,7 @@ import { Geolocation } from '@ionic-native/geolocation/ngx';
 import { LocationAccuracy } from '@ionic-native/location-accuracy/ngx';
 import { SQLite } from '@ionic-native/sqlite/ngx';
 import { Network } from '@ionic-native/network/ngx';
+import { NFC } from '@ionic-native/nfc/ngx';
 
 @NgModule({
   declarations: [AppComponent],
@@ -34,6 +35,7 @@ import { Network } from '@ionic-native/network/ngx';
     Geolocation,
     LocationAccuracy,
     SQLite,
+    NFC,
     { provide: RouteReuseStrategy, useClass: IonicRouteStrategy },
     ScreenOrientation,
     Network

@@ -10,6 +10,7 @@ import { Geolocation } from '@ionic-native/geolocation/ngx';
 import { LocationAccuracy } from '@ionic-native/location-accuracy/ngx';
 import { SQLite, SQLiteObject } from '@ionic-native/sqlite/ngx';
 import { Network } from '@ionic-native/network/ngx';
+import { NFC } from '@ionic-native/nfc/ngx';
 
 @Component({
   selector: 'app-home',
@@ -18,6 +19,12 @@ import { Network } from '@ionic-native/network/ngx';
 })
 export class HomePage {
   
+  private codProd: string;
+  private nomeProd: string;
+  private marcaProd: string;
+  private dataValiProd: Date;
+  private precoProd: string;
+  private pesoProd: string;
   private textoTraduzido: string = "";
   private distancia: string = "";  
   private readonly database_name: string = "TCC.db"; 
@@ -25,17 +32,23 @@ export class HomePage {
   private locationCoords: any;
   public row_data: any = []; 
   private databaseObj: SQLiteObject; 
+  private prodInfo: boolean = false;
+  private continua: boolean = false;
 
   constructor(private speechRecognition: SpeechRecognition, private screenOrientation: ScreenOrientation, private statusBar: StatusBar, 
               private tts: TextToSpeech, public loadingController: LoadingController, private vibration: Vibration, private androidPermissions: AndroidPermissions,
-              private geolocation: Geolocation, private locationAccuracy: LocationAccuracy, private sqlite: SQLite, private network: Network) {
+              private geolocation: Geolocation, private locationAccuracy: LocationAccuracy, private sqlite: SQLite, private network: Network,
+              private nfc: NFC) {
     this.locationCoords = {
       latitude: "",
       longitude: ""
     }
     this.network.onDisconnect().subscribe(() => {
       this.playVoz('Por favor verifique sua conexão com a internet!');
-    });    
+    });
+    
+    this.checkNFC();
+    this.lerNFC();
   }
 
   /**
@@ -54,6 +67,7 @@ export class HomePage {
   * @param {_latitude}
   * @param {_longitude}
   * @param {_opcao}
+  * @param {_codProd}
   */
 
   ngOnInit(){
@@ -73,35 +87,35 @@ export class HomePage {
     this.createDB();
   }
 
-  private checkVozPermission(){
+  private checkVozPermission() {
     // Verificando a permissao de voz e solicita permissao
     this.speechRecognition.hasPermission()
     .then((hasPermission: boolean) => {
-      if (!hasPermission){           
-        this.speechRecognition.requestPermission()
+      if (!hasPermission) {           
+        this.speechRecognition.requestPermission();
       }
     });
   }
 
-  private checkGPSPermission(){
+  private checkGPSPermission() {
     // Verifique se o aplicativo tem permissão de acesso GPS
     this.androidPermissions.checkPermission(this.androidPermissions.PERMISSION.ACCESS_COARSE_LOCATION)
     .then(result =>{
-      if (result.hasPermission){
+      if (result.hasPermission) {
         //Se tiver permissão, mostre a caixa de diálogo "Ativar GPS"
         this.askToTurnOnGPS(1);
-      }else{
+      } else {
         //Se não tiver permissão, peça permissão
         this.requestGPSPermission();
       }
     });
   }
 
-  private askToTurnOnGPS(_opcao: number){    
+  private askToTurnOnGPS(_opcao: number) {    
     this.locationAccuracy.request(this.locationAccuracy.REQUEST_PRIORITY_HIGH_ACCURACY)
     .then(() => {
       // Quando o GPS ativar o método de chamada vai obter as coordenadas da localização precisa do celular  
-      if (_opcao == 2){
+      if (_opcao == 2) {
         this.getLocationCoordinates(); 
       }                    
     }).catch(() => {         
@@ -109,12 +123,12 @@ export class HomePage {
     });
   }
 
-  private requestGPSPermission(){
+  private requestGPSPermission() {
     this.locationAccuracy.canRequest()
     .then((canRequest: boolean) => {
-      if (canRequest){
+      if (canRequest) {
         console.log("Sucesso Permissao GPS!");
-      }else{
+      } else {
         //Mostrar o diálogo 'Solicitação de permissão GPS'
         this.androidPermissions.requestPermission(this.androidPermissions.PERMISSION.ACCESS_COARSE_LOCATION)
         .then(() => {
@@ -126,7 +140,7 @@ export class HomePage {
   }
 
   // Metodo para obter coordenadas precisas do dispositivo usando o GPS do dispositivo
-  private getLocationCoordinates(){
+  private getLocationCoordinates() {
     this.geolocation.getCurrentPosition({
       enableHighAccuracy: true
     })
@@ -143,15 +157,16 @@ export class HomePage {
     });
   }
 
-  public PesquisaProd(){  
-    if (this.network.type != 'none'){  
-      this.askToTurnOnGPS(2);
-    }else{
+  public PesquisaProd() {  
+    if (this.network.type != 'none') {      
+      this.continua = true;
+      this.checkNFC();        
+    } else {
       this.playVoz('Não será possível consultar o produto, pois não possui conexão com a internet!');
     }
   }
 
-  private startVoz(){
+  private startVoz() {
     // Processo de reconhecimento de voz
     let options = {
       language: 'pt-BR',
@@ -161,18 +176,19 @@ export class HomePage {
     }
     
     this.speechRecognition.startListening(options).subscribe(matches => {
-      if (matches && matches.length > 0){
-        this.textoTraduzido = matches[0]
-        this.playVoz('Aguarde, localizando produto!')
-        this.controlerCarregamento('Aguarde, encontrando produto...', 3000)
-        setTimeout(() => { this.getRows( this.textoTraduzido ) }, 3050)                 
+      if (matches && matches.length > 0) {
+        this.textoTraduzido = matches[0];  
+        this.prodInfo = true;      
+        this.playVoz('Aguarde, localizando produto!');
+        this.controlerCarregamento('Aguarde, encontrando produto...', 3000);
+        setTimeout(() => { this.getRows( this.textoTraduzido ) }, 3050);                 
       }
     },(onerror) => {
       console.log('error:', onerror);    
     })
   }
 
-  private playVoz(_text: string){
+  private playVoz(_text: string) {
     // Processo de falar
     this.tts.speak({
       text : _text,
@@ -198,7 +214,7 @@ export class HomePage {
     return console.log('Sucesso!');
   }
 
-  private calculaDistancia(_lat1: number, _lon1: number, _lat2: number, _lon2: number){
+  private calculaDistancia(_lat1: number, _lon1: number, _lat2: number, _lon2: number) {
     var deg2rad = 0.017453292519943295; // Math.PI / 180
     var cos = Math.cos;
 
@@ -218,7 +234,7 @@ export class HomePage {
     return this.distancia;
   }
 
-  private createDB(){
+  private createDB() {
     this.sqlite.create({
       name: this.database_name,
       location: 'default'
@@ -228,7 +244,7 @@ export class HomePage {
       this.createTable();
       console.log('DataBase criado!');
     }).catch(e => {
-      console.log("error database " + JSON.stringify(e))
+      console.log("error database " + JSON.stringify(e));
     });
   }
 
@@ -247,11 +263,11 @@ export class HomePage {
       this.insertRow();
       console.log('Table Created!');
     }).catch(e => {
-      console.log("error criar tabela " + JSON.stringify(e))
+      console.log("error criar tabela " + JSON.stringify(e));
     });
   }
   
-  private insertRow(){  
+  private insertRow() {  
     this.databaseObj.executeSql("SELECT COUNT(*) AS qtd FROM " + this.table_name, []) 
     .then((res) => {
       this.row_data = [];
@@ -265,48 +281,113 @@ export class HomePage {
         .then(() => {          
           console.log('Registros inseridos!');
         }).catch(e => {
-          console.log("error inserir registros " + JSON.stringify(e))
+          console.log("error inserir registros " + JSON.stringify(e));
         });
       }
     }).catch(e => {
-      console.log("error consultar total registros " + JSON.stringify(e))
+      console.log("error consultar total registros " + JSON.stringify(e));
     });
   }
 
   private getRows(_produto: string){
-    this.databaseObj.executeSql("SELECT nome_prod, marca_prod, data_validade_prod, REPLACE(preco_prod, '.', ' reais e ') || ' centavos' AS preco_prod, peso, latitude, longitude "+
+    this.databaseObj.executeSql("SELECT cod_prod, nome_prod, marca_prod, data_validade_prod, REPLACE(preco_prod, '.', ' reais e ') || ' centavos' AS preco_prod, peso, latitude, longitude "+
                                 "FROM " + this.table_name + " WHERE (nome_prod LIKE ?)", ['%' + _produto + '%'])
     .then((res) => {      
       this.row_data = [];
-      if (res.rows.length > 0){        
-        for (var i = 0; i < res.rows.length; i++) {                           
-          this.localizarProd(res.rows.item(i).nome_prod, res.rows.item(i).marca_prod, res.rows.item(i).data_validade_prod, res.rows.item(i).preco_prod, res.rows.item(i).peso, res.rows.item(i).latitude, res.rows.item(i).longitude);
+      if (res.rows.length > 0) {        
+        for (var i = 0; i < res.rows.length; i++) {  
+          this.codProd = res.rows.item(i).cod_prod; 
+          this.nomeProd = res.rows.item(i).nome_prod;  
+          this.marcaProd = res.rows.item(i).marca_prod;
+          this.dataValiProd = res.rows.item(i).data_validade_prod;
+          this.precoProd = res.rows.item(i).preco_prod;
+          this.pesoProd = res.rows.item(i).peso;     
+
+          if (this.prodInfo) {      
+            this.localizarProd(res.rows.item(i).latitude, res.rows.item(i).longitude);
+          }
         }
-      }else{
-        this.vibration.vibrate(1000);           
+      } else {
+        this.vibration.vibrate(1000);    
+        this.prodInfo = false; 
+        this.continua = false;       
         this.playVoz('Produto não encontrado!');
-        this.controlerCarregamento('Produto não encontrado...', 2000)
+        this.controlerCarregamento('Produto não encontrado...', 2000);
       }
     }).catch(()=> {      
-      this.playVoz("Erro ao realizar consulta do produto!")
+      this.playVoz("Erro ao realizar consulta do produto!");
     });
   }
  
-  private localizarProd(_nomeProd: string, _marca: string, _dataValid: Date, _preco: string, _peso: string, _latitude: number, _longitude: number){
+  private localizarProd(_latitude: number, _longitude: number) {
     this.vibration.vibrate(1000);    
-
     this.controlerCarregamento('Produto encontrado, o produto se localiza, cerca de ' + this.calculaDistancia(this.locationCoords.latitude, this.locationCoords.longitude, _latitude, _longitude) + ' metros de distância...', 6000); 
     this.playVoz('Produto encontrado, o produto se localiza, cerca de: ' + this.calculaDistancia(this.locationCoords.latitude, this.locationCoords.longitude, _latitude, _longitude) + ' metros de distância!');
-
-    setTimeout(() => { this.controlerCarregamento('Informações do produto...', 15000) }, 6500);
-    setTimeout(() => { 
-      this.playVoz('Informações do item: '+ 
-      'Produto: '+ _nomeProd +', '+        
-      'Marca: '+ _marca +', '+
-      'Data de Validade: '+ _dataValid +', '+
-      'Preço: '+ _preco +', '+
-      'Peso: '+ _peso +'')
-    }, 8000);
   }
+
+  private informacaoProduto(_nomeProd: string) {
+    if (this.prodInfo) {
+      if (_nomeProd == this.nomeProd) {
+        this.controlerCarregamento('Informações do produto...', 15000);
+        this.playVoz('Etiqueta lida com sucesso!');
+        setTimeout(() => { this.playVoz('Informações do item: '+ 
+          'Produto: '+ this.nomeProd +', '+        
+          'Marca: '+ this.marcaProd +', '+
+          'Data de Validade: '+ this.dataValiProd +', '+
+          'Preço: '+ this.precoProd +', '+
+          'Peso: '+ this.pesoProd +'')
+        }, 2500);
+        this.prodInfo = false;
+        this.continua = false;
+      } else {
+        this.playVoz('Esta etiqueta lida, não é o produto que foi informado!');
+      }
+    } else {
+      this.getRows(_nomeProd);
+      this.controlerCarregamento('Informações do produto...', 16000);
+      this.playVoz('Etiqueta lida com sucesso!');
+      setTimeout(() => { this.playVoz('Informações do item: '+ 
+        'Produto: '+ this.nomeProd +', '+        
+        'Marca: '+ this.marcaProd +', '+
+        'Data de Validade: '+ this.dataValiProd +', '+
+        'Preço: '+ this.precoProd +', '+
+        'Peso: '+ this.pesoProd +'')
+      }, 2500);
+      this.prodInfo = false; 
+      this.continua = false;
+    }
+  }
+
+  private lerNFC() {
+    this.nfc.addNdefListener().subscribe(data => {
+      if (data && data.tag && data.tag.id){
+        if (data.tag.ndefMessage) {
+          let payload = data.tag.ndefMessage[0].payload;
+          let tagContent = this.nfc.bytesToString(payload).substring(3);
+          this.informacaoProduto(tagContent);
+        } else {
+          this.playVoz('A etiqueta, não possui nenhuma informação!');
+        }
+      }
+    });
+  }
+
+  private checkNFC() {
+    this.nfc.enabled()
+    .then (() => {
+      if (this.continua) {
+        this.askToTurnOnGPS(2);
+      }
+    }).catch(e => {
+      if (e == 'NFC_DISABLED') {
+        this.playVoz('Por favor, ative o modo NFC de seu celular!');        
+      }
+      if (e == 'NO_NFC') {
+        this.playVoz('Infelizmente, não será possível realizar as atividades do aplicativo Zani Acessibilidade, pois seu celular não possui tecnologia NFC!');
+      }      
+    });
+  }
+
+
 }
 

@@ -116,4 +116,5 @@
     <plugin name="cordova-sqlite-storage" />
     <plugin name="cordova-plugin-network-information" spec="^2.0.2" />
     <plugin name="cordova-plugin-add-swift-support" />
+    <plugin name="phonegap-nfc" spec="^1.0.3" />
 </widget>
