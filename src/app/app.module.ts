@@ -16,6 +16,8 @@ import { LocationAccuracy } from '@ionic-native/location-accuracy/ngx';
 import { SQLite } from '@ionic-native/sqlite/ngx';
 import { Network } from '@ionic-native/network/ngx';
 import { NFC } from '@ionic-native/nfc/ngx';
+import { BLE } from '@ionic-native/ble/ngx';
+import { Insomnia } from '@ionic-native/insomnia/ngx';
 
 @NgModule({
   declarations: [AppComponent],
@@ -36,6 +38,8 @@ import { NFC } from '@ionic-native/nfc/ngx';
     LocationAccuracy,
     SQLite,
     NFC,
+    BLE,
+    Insomnia,
     { provide: RouteReuseStrategy, useClass: IonicRouteStrategy },
     ScreenOrientation,
     Network

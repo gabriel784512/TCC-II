@@ -11,6 +11,9 @@ import { LocationAccuracy } from '@ionic-native/location-accuracy/ngx';
 import { SQLite, SQLiteObject } from '@ionic-native/sqlite/ngx';
 import { Network } from '@ionic-native/network/ngx';
 import { NFC } from '@ionic-native/nfc/ngx';
+import { IBeacon } from '@ionic-native/ibeacon/ngx';
+import { BLE } from '@ionic-native/ble/ngx';
+import { Insomnia } from '@ionic-native/insomnia/ngx';
 
 @Component({
   selector: 'app-home',
@@ -19,63 +22,66 @@ import { NFC } from '@ionic-native/nfc/ngx';
 })
 export class HomePage {
   
-  private codProd: string;
+  // Variaveis do tipo STRING  
   private nomeProd: string;
-  private marcaProd: string;
-  private dataValiProd: Date;
+  private marcaProd: string;  
   private precoProd: string;
   private pesoProd: string;
-  private textoTraduzido: string = "";
-  private distancia: string = "";  
+  private longProd: string;
+  private latProd: string;
+  private textoTraduzido: string = "";    
+  private idBeacon: string = "";
   private readonly database_name: string = "TCC.db"; 
   private readonly table_name: string = "produtos"; 
-  private locationCoords: any;
-  public row_data: any = []; 
-  private databaseObj: SQLiteObject; 
-  private prodInfo: boolean = false;
-  private continua: boolean = false;
 
-  constructor(private speechRecognition: SpeechRecognition, private screenOrientation: ScreenOrientation, private statusBar: StatusBar, 
-              private tts: TextToSpeech, public loadingController: LoadingController, private vibration: Vibration, private androidPermissions: AndroidPermissions,
-              private geolocation: Geolocation, private locationAccuracy: LocationAccuracy, private sqlite: SQLite, private network: Network,
-              private nfc: NFC) {
+  // Variaveis do tipo NUMBER
+  private rssi: number;  
+  private distanciaMediaBeacon: number;
+  private distanciaBeacon: number;
+  private distanciaFinal: number;
+  private distanciaProd: number;
+  private countRSSI: number = 0;
+  private somaRSSI: number = 0;
+
+  // Variaveis do tipo BOOLEAN
+  private prodInfo: boolean = false;
+  private continuaProd: boolean = false;
+  private encontraSecao: boolean = false;
+
+  // Variaveis do tipo ANY
+  private locationCoords: any;   
+  
+  // Variaveis do tipo DATE
+  private dataValiProd: Date;
+
+  // Variaveis do tipo SQLiteObject
+  private databaseObj: SQLiteObject; 
+       
+  constructor(private speechRecognition: SpeechRecognition, private screenOrientation: ScreenOrientation, private statusBar: StatusBar, private tts: TextToSpeech, 
+              public loadingController: LoadingController, private vibration: Vibration, private androidPermissions: AndroidPermissions, private geolocation: Geolocation,
+              private locationAccuracy: LocationAccuracy, private sqlite: SQLite, private network: Network, private nfc: NFC, private ibeacon: IBeacon, private ble: BLE, private insomnia: Insomnia) {
     this.locationCoords = {
       latitude: "",
       longitude: ""
     }
+
     this.network.onDisconnect().subscribe(() => {
       this.playVoz('Por favor verifique sua conexão com a internet!');
     });
     
     this.checkNFC();
-    this.lerNFC();
+    this.lerNFC();      
   }
 
-  /**
-  * @param {_text}
-  * @param {_time}
-  * @param {_lat1}
-  * @param {_lon1}
-  * @param {_lat2} 
-  * @param {_lon2}
-  * @param {_produto}
-  * @param {_nomeProd}
-  * @param {_marca}
-  * @param {_dataValid}
-  * @param {_preco}
-  * @param {_peso}
-  * @param {_latitude}
-  * @param {_longitude}
-  * @param {_opcao}
-  * @param {_codProd}
-  */
-
-  ngOnInit(){
+  ngOnInit() {
     // Definindo sempre modo retrato
     this.screenOrientation.lock(this.screenOrientation.ORIENTATIONS.PORTRAIT);
 
     // Deixa claro o statusBar do celular
     this.statusBar.styleBlackOpaque();
+
+    // Verificando se o Bluetooth esta ativado ou nao
+    this.checkBluetooth();
 
     // Verificando permissao para microfone do celular
     this.checkVozPermission();
@@ -85,6 +91,48 @@ export class HomePage {
 
     // Criando base de dados
     this.createDB();
+
+    // Impedir que celular adormeça
+    this.NoCelularInsonia();
+  }
+
+  public PesquisaProd() {  
+    if (this.network.type != 'none') {      
+      this.continuaProd = true;
+      this.checkNFC();        
+    } else {
+      this.playVoz('Não será possível consultar o produto, pois não possui conexão com a internet!');
+    }
+  }
+
+  private checkNFC() {
+    this.nfc.enabled()
+    .then (() => {
+      if (this.continuaProd) {
+        this.askToTurnOnGPS(2);
+      }
+    }).catch(e => {
+      if (e == 'NFC_DISABLED') {
+        this.playVoz('Por favor, ative o modo NFC do seu celular!');        
+      }
+      if (e == 'NO_NFC') {
+        this.playVoz('Infelizmente, não será possível realizar as atividades do aplicativo Zani Acessibilidade, pois seu celular não possui a tecnologia NFC!');
+      }      
+    });
+  }
+
+  private lerNFC() {
+    this.nfc.addNdefListener().subscribe(data => {
+      if (data && data.tag && data.tag.id) {
+        if (data.tag.ndefMessage) {
+          let payload = data.tag.ndefMessage[0].payload;
+          let tagContent = this.nfc.bytesToString(payload).substring(3);
+          this.informacaoProduto(tagContent);
+        } else {
+          this.playVoz('A etiqueta, não possui nenhuma informação!');
+        }
+      }
+    });
   }
 
   private checkVozPermission() {
@@ -113,10 +161,11 @@ export class HomePage {
 
   private askToTurnOnGPS(_opcao: number) {    
     this.locationAccuracy.request(this.locationAccuracy.REQUEST_PRIORITY_HIGH_ACCURACY)
-    .then(() => {
-      // Quando o GPS ativar o método de chamada vai obter as coordenadas da localização precisa do celular  
-      if (_opcao == 2) {
-        this.getLocationCoordinates(); 
+    .then(() => {      
+      if (_opcao == 2) {                 
+        this.playVoz('Por favor informe o produto que deseja encontrar!');
+        this.controlerCarregamento('Por favor informe o produto que deseja encontrar...', 3000);
+        setTimeout(() => { this.startVoz() }, 3010); 
       }                    
     }).catch(() => {         
       this.playVoz('Erro ao solicitar permissão de localização!');
@@ -139,33 +188,6 @@ export class HomePage {
     });
   }
 
-  // Metodo para obter coordenadas precisas do dispositivo usando o GPS do dispositivo
-  private getLocationCoordinates() {
-    this.geolocation.getCurrentPosition({
-      enableHighAccuracy: true
-    })
-    .then((resp) => {
-      this.locationCoords.latitude = resp.coords.latitude;
-      this.locationCoords.longitude = resp.coords.longitude;  
-      
-      this.playVoz('Por favor informe o produto que deseja encontrar!');
-      this.controlerCarregamento('Por favor informe o produto que deseja encontrar...', 3000);
-      setTimeout(() => { this.startVoz() }, 3050);
-      
-    }).catch(() => {
-      this.playVoz('Erro ao obter a localização!');            
-    });
-  }
-
-  public PesquisaProd() {  
-    if (this.network.type != 'none') {      
-      this.continua = true;
-      this.checkNFC();        
-    } else {
-      this.playVoz('Não será possível consultar o produto, pois não possui conexão com a internet!');
-    }
-  }
-
   private startVoz() {
     // Processo de reconhecimento de voz
     let options = {
@@ -175,13 +197,12 @@ export class HomePage {
       showPopup: true,                
     }
     
-    this.speechRecognition.startListening(options).subscribe(matches => {
+    this.speechRecognition.startListening(options)
+    .subscribe(matches => {
       if (matches && matches.length > 0) {
         this.textoTraduzido = matches[0];  
         this.prodInfo = true;      
-        this.playVoz('Aguarde, localizando produto!');
-        this.controlerCarregamento('Aguarde, encontrando produto...', 3000);
-        setTimeout(() => { this.getRows( this.textoTraduzido ) }, 3050);                 
+        this.getRows(this.textoTraduzido);                 
       }
     },(onerror) => {
       console.log('error:', onerror);    
@@ -195,7 +216,7 @@ export class HomePage {
       locale: 'pt-BR',
       rate: 1
     }).then(() => {
-      console.log('Successo!!');
+      console.log('Successo voz!!');
     }).catch((reason: any) => {
       console.log(reason);
     })
@@ -211,27 +232,7 @@ export class HomePage {
     
     await loading.present();
     await loading.onDidDismiss();
-    return console.log('Sucesso!');
-  }
-
-  private calculaDistancia(_lat1: number, _lon1: number, _lat2: number, _lon2: number) {
-    var deg2rad = 0.017453292519943295; // Math.PI / 180
-    var cos = Math.cos;
-
-    _lat1 *= deg2rad;
-    _lon1 *= deg2rad;
-    _lat2 *= deg2rad;
-    _lon2 *= deg2rad;
-
-    var diam = 12742; // Diâmetro da terra em km
-    var dLat = _lat2 - _lat1;
-    var dLon = _lon2 - _lon1;
-    var a = ((1 - cos(dLat)) + 
-             (1 - cos(dLon)) * cos(_lat1) * cos(_lat2)) / 2;
-
-    this.distancia = (diam * Math.asin(Math.sqrt(a)) * 1000).toFixed(0);
-
-    return this.distancia;
+    return console.log('Sucesso controler!');
   }
 
   private createDB() {
@@ -244,7 +245,7 @@ export class HomePage {
       this.createTable();
       console.log('DataBase criado!');
     }).catch(e => {
-      console.log("error database " + JSON.stringify(e));
+      console.log("Erro database " + JSON.stringify(e));
     });
   }
 
@@ -261,56 +262,56 @@ export class HomePage {
     'longitude           TEXT NOT NULL) ', [])
     .then(() => {            
       this.insertRow();
-      console.log('Table Created!');
+      console.log('Tabela criado!');
     }).catch(e => {
-      console.log("error criar tabela " + JSON.stringify(e));
+      console.log("Erro ao criar tabela " + JSON.stringify(e));
     });
   }
   
   private insertRow() {  
     this.databaseObj.executeSql("SELECT COUNT(*) AS qtd FROM " + this.table_name, []) 
-    .then((res) => {
-      this.row_data = [];
+    .then((res) => {      
       if (res.rows.item(0).qtd == 0) {
-        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '1', 'Uva Verde', 'Doce Mel', '2020-10-20', 7.49, '500 gramas', '-10.882311', '-61.968192'])
-        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '2', 'Feijão Preto', 'Carioca', '2021-08-10', 8.99, '1 quilo', '-10.719771', '-62.248611'])
-        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '3', 'Arroz Integral', 'Tio Urbano', '2022-03-02', 14.39, '5 quilos', '-10.719771', '-62.248611'])
-        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '4', 'Leite Integral', 'Italac', '2019-12-04', 2.59, '1 litro', '-10.882311', '-61.968192'])
-        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '5', 'Café Tradicional', 'Três Corações', '2021-06-30', 7.99, '500 gramas', '-10.882311', '-61.968192'])
-        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '6', 'Trigo Tradicional', 'Dona Benta', '2022-11-25', 8.99, '1 quilo', '-10.882311', '-61.968192'])
+        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '1', 'Uva Verde', 'Doce Mel', '2020-10-20', 7.49, '500 gramas', '-10.719707', '-62.248589'])
+        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '2', 'Feijão Preto', 'Carioca', '2021-08-10', 8.99, '1 quilo', '-10.719707', '-62.248589'])
+        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '3', 'Arroz Integral', 'Tio Urbano', '2022-03-02', 14.39, '5 quilos', '-10.719707', '-62.248589'])
+        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '4', 'Leite Integral', 'Italac', '2019-12-04', 2.59, '1 litro', '-10.719707', '-62.248589'])
+        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '5', 'Café Tradicional', 'Três Corações', '2021-06-30', 7.99, '500 gramas', '-10.719707', '-62.248589'])
+        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '6', 'Trigo Tradicional', 'Dona Benta', '2022-11-25', 8.99, '1 quilo', '-10.719707', '-62.248589'])
         .then(() => {          
           console.log('Registros inseridos!');
         }).catch(e => {
-          console.log("error inserir registros " + JSON.stringify(e));
+          console.log("Erro ao inserir registros " + JSON.stringify(e));
         });
       }
     }).catch(e => {
-      console.log("error consultar total registros " + JSON.stringify(e));
+      console.log("Erro consultar total registros " + JSON.stringify(e));
     });
   }
 
   private getRows(_produto: string){
-    this.databaseObj.executeSql("SELECT cod_prod, nome_prod, marca_prod, data_validade_prod, REPLACE(preco_prod, '.', ' reais e ') || ' centavos' AS preco_prod, peso, latitude, longitude "+
+    this.databaseObj.executeSql("SELECT nome_prod, marca_prod, data_validade_prod, REPLACE(preco_prod, '.', ' reais e ') || ' centavos' AS preco_prod, peso, latitude, longitude "+
                                 "FROM " + this.table_name + " WHERE (nome_prod LIKE ?)", ['%' + _produto + '%'])
-    .then((res) => {      
-      this.row_data = [];
+    .then((res) => {            
       if (res.rows.length > 0) {        
-        for (var i = 0; i < res.rows.length; i++) {  
-          this.codProd = res.rows.item(i).cod_prod; 
+        for (var i = 0; i < res.rows.length; i++) {             
           this.nomeProd = res.rows.item(i).nome_prod;  
           this.marcaProd = res.rows.item(i).marca_prod;
           this.dataValiProd = res.rows.item(i).data_validade_prod;
           this.precoProd = res.rows.item(i).preco_prod;
           this.pesoProd = res.rows.item(i).peso;     
-
-          if (this.prodInfo) {      
-            this.localizarProd(res.rows.item(i).latitude, res.rows.item(i).longitude);
+          this.longProd = res.rows.item(i).longitude;
+          this.latProd = res.rows.item(i).latitude;
+          if (this.prodInfo) {   
+            this.playVoz('Aguarde, localizando a seção do produto!');
+            this.controlerCarregamento('Aguarde localizando a seção do produto...', 3500);               
+            this.rotaSecao();
           }
         }
       } else {
         this.vibration.vibrate(1000);    
         this.prodInfo = false; 
-        this.continua = false;       
+        this.continuaProd = false;       
         this.playVoz('Produto não encontrado!');
         this.controlerCarregamento('Produto não encontrado...', 2000);
       }
@@ -319,16 +320,10 @@ export class HomePage {
     });
   }
  
-  private localizarProd(_latitude: number, _longitude: number) {
-    this.vibration.vibrate(1000);    
-    this.controlerCarregamento('Produto encontrado, o produto se localiza, cerca de ' + this.calculaDistancia(this.locationCoords.latitude, this.locationCoords.longitude, _latitude, _longitude) + ' metros de distância...', 6000); 
-    this.playVoz('Produto encontrado, o produto se localiza, cerca de: ' + this.calculaDistancia(this.locationCoords.latitude, this.locationCoords.longitude, _latitude, _longitude) + ' metros de distância!');
-  }
-
   private informacaoProduto(_nomeProd: string) {
     if (this.prodInfo) {
       if (_nomeProd == this.nomeProd) {
-        this.controlerCarregamento('Informações do produto...', 15000);
+        this.controlerCarregamento('Informações do produto...', 16000);
         this.playVoz('Etiqueta lida com sucesso!');
         setTimeout(() => { this.playVoz('Informações do item: '+ 
           'Produto: '+ this.nomeProd +', '+        
@@ -338,9 +333,10 @@ export class HomePage {
           'Peso: '+ this.pesoProd +'')
         }, 2500);
         this.prodInfo = false;
-        this.continua = false;
+        this.continuaProd = false;
       } else {
         this.playVoz('Esta etiqueta lida, não é o produto que foi informado!');
+        this.controlerCarregamento('Esta etiqueta lida, não é o produto que foi informado!', 4000); 
       }
     } else {
       this.getRows(_nomeProd);
@@ -354,40 +350,210 @@ export class HomePage {
         'Peso: '+ this.pesoProd +'')
       }, 2500);
       this.prodInfo = false; 
-      this.continua = false;
+      this.continuaProd = false;
     }
   }
 
-  private lerNFC() {
-    this.nfc.addNdefListener().subscribe(data => {
-      if (data && data.tag && data.tag.id){
-        if (data.tag.ndefMessage) {
-          let payload = data.tag.ndefMessage[0].payload;
-          let tagContent = this.nfc.bytesToString(payload).substring(3);
-          this.informacaoProduto(tagContent);
+  private rotaSecao() {
+    this.countRSSI = 0; 
+    this.somaRSSI = 0;
+    this.encontraSecao = false;
+
+    this.startBeacon();
+
+    setTimeout(() => {  
+      if (this.idBeacon != "") {    
+        if (this.distanciaFinal > 2) { 
+          this.vibration.vibrate(1000);              
+          this.playVoz('O produto se localiza na seção de grãos, aproximadamente a ' + this.distanciaFinal + ' metros de distância. Por favor siga até a seção de grãos!');  
+          this.controlerCarregamento('O produto se localiza na seção de grãos aproximadamente a ' + this.distanciaFinal + ' metros de distância. Por favor siga até a seção de grãos...', 10000); 
+          
+          setTimeout(() => {
+            let idDistancia = setInterval( () => {            
+              this.encontraSecao = false;
+              this.controlerCarregamento('Por favor dirigir-se até seção de grãos...', 4000);
+              this.startBeacon();                               
+            }, 4300);
+
+            let idValida = setInterval( () => {                          
+              if (this.distanciaFinal <= 2) {
+                this.vibration.vibrate(1000); 
+                this.playVoz('Você já se encontra no local onde está o produto!'); 
+                this.encontraSecao = true;
+                clearInterval(idDistancia);
+                clearInterval(idValida);
+                this.stopBeacon();
+                setTimeout(() => {
+                  this.rotaProduto();
+                }, 5000);
+              } 
+            }, 4300);   
+          }, 10001);          
         } else {
-          this.playVoz('A etiqueta, não possui nenhuma informação!');
+          this.vibration.vibrate(1000); 
+          this.playVoz('O produto se localiza na seção de grãos. Você já se encontra no local onde está o produto!'); 
+          this.controlerCarregamento('O produto se localiza na seção de grãos. Você já se encontra no local onde está o produto...', 6000); 
+          setTimeout(() => {
+            this.rotaProduto();
+          }, 7000);
         }
       }
-    });
+    }, 4000);
   }
 
-  private checkNFC() {
-    this.nfc.enabled()
-    .then (() => {
-      if (this.continua) {
-        this.askToTurnOnGPS(2);
-      }
-    }).catch(e => {
-      if (e == 'NFC_DISABLED') {
-        this.playVoz('Por favor, ative o modo NFC de seu celular!');        
-      }
-      if (e == 'NO_NFC') {
-        this.playVoz('Infelizmente, não será possível realizar as atividades do aplicativo Zani Acessibilidade, pois seu celular não possui tecnologia NFC!');
+  private startBeacon() {
+
+    this.idBeacon = "";
+
+    this.ble.startScan([]).subscribe(device => {      
+      this.idBeacon = JSON.stringify(device.id);
+      this.rssi = parseInt(JSON.stringify(device.rssi));     
+    });
+
+    setTimeout(() => { 
+      if (this.idBeacon == "") {
+        if (!this.encontraSecao) {
+          this.playVoz('Não foi possível obter as informações do local, onde se encontra o produto!');           
+        }                
+      } else {                              
+        this.calculaDistanciaBeacon(this.rssi);        
       }      
+    }, 3000);
+  }
+
+  private stopBeacon() {
+    this.ble.stopScan()
+    .then(() => {
+      console.log('Parando monitoramento do beacon');
     });
   }
 
+  private calculaDistanciaBeacon(_rssi: number) { 
+    // txPower recebido do Beacon
+    var txPower = -100;  
+    var distBeacon = 0;
 
+    // Calcula a distancia media do RSSI recebido
+    this.countRSSI ++;
+    this.somaRSSI = this.somaRSSI + _rssi;
+
+    var mediaRSSI = this.somaRSSI / this.countRSSI;
+
+    var ratio_media = txPower - mediaRSSI;
+    var ratio_linear_media = Math.pow(10, ratio_media / 10);
+
+    this.distanciaMediaBeacon = Math.sqrt(ratio_linear_media);
+    //-------------------------------------------------------------------------
+
+    //Calcula a distancia do RSSI em tempo real
+    var ratio = txPower - _rssi;
+    var ratio_linear = Math.pow(10, ratio / 10);
+    this.distanciaBeacon = Math.sqrt(ratio_linear);
+    //------------------------------------------------------------------------- 
+
+    if (this.distanciaMediaBeacon < this.distanciaBeacon) {        
+      distBeacon = this.distanciaMediaBeacon;     
+    } else {        
+      distBeacon = this.distanciaBeacon;        
+    }
+
+    // Transformando distancia do beacon de CM para Metros
+    var dist_cm = distBeacon.toFixed(2);
+    var dist_metros = (parseFloat(dist_cm) * 100).toFixed(0);
+    this.distanciaFinal = parseInt(dist_metros);
+
+    return this.distanciaFinal;    
+  }
+
+  private rotaProduto() {
+
+    this.playVoz('Aguarde encontrando o produto...');
+    this.controlerCarregamento('Aguarde encontrando o produto...', 2400);
+    this.localizarDispositivo();
+
+    setTimeout(() => {
+      if (typeof this.distanciaProd === "undefined") {
+        this.playVoz('Não foi possível localizar o produto desejado. Por favor repita o processo novamente!');
+        this.controlerCarregamento('Não foi possível localizar o produto desejado. Por favor repita o processo novamente...', 6000);
+      } else {
+        if (this.distanciaProd <= 2) {             
+          this.vibration.vibrate(1000); 
+          this.playVoz('O produto desejado se encontra em uma distância aproximadamente de ' + this.distanciaProd + ' metro de distância. Por favor aproxime seu celular até o produto!'); 
+          this.controlerCarregamento('O produto desejado se encontra em uma distância aproximadamente de ' + this.distanciaProd + ' metro de distância...', 6000);                                              
+        } else {          
+          this.vibration.vibrate(1000);         
+          this.playVoz('Produto encontrado. O produto se localiza, aproximadamente a ' + this.distanciaProd + ' metros de distância!'); 
+          this.controlerCarregamento('Produto encontrado, o produto se localiza aproximadamente a ' + this.distanciaProd + ' metros de distância...', 6000); 
+
+          setTimeout(() => {
+            let idDistanciaProd = setInterval(() => { 
+              this.controlerCarregamento('Por favor dirigir-se até o produto...', 2500);           
+              this.localizarDispositivo();
+            }, 3000);
+
+            let idStopDistanciaProd = setInterval(() => {          
+              if (this.distanciaProd <= 2) {              
+                clearInterval(idDistanciaProd);
+                clearInterval(idStopDistanciaProd);
+                this.vibration.vibrate(1000); 
+                this.playVoz('O produto desejado se encontra em uma distância aproximadamente de ' + this.distanciaProd + ' metro de distância. Por favor aproxime seu celular até o produto!'); 
+                this.controlerCarregamento('O produto desejado se encontra em uma distância aproximadamente de ' + this.distanciaProd + ' metro de distância...', 6000);
+              }            
+            }, 3000);
+          }, 6001);
+        }
+      }
+    }, 4000);
+  }
+
+  private localizarDispositivo() {
+    this.geolocation.getCurrentPosition({
+      enableHighAccuracy: true
+    })
+    .then((resp) => {
+      this.locationCoords.latitude = resp.coords.latitude;
+      this.locationCoords.longitude = resp.coords.longitude; 
+
+      this.calculaDistanciaProd(this.locationCoords.latitude, this.locationCoords.longitude, parseFloat(this.latProd), parseFloat(this.longProd));
+    }).catch(() => {
+      this.playVoz('Erro ao obter a localização!');            
+    });
+  }
+
+  private calculaDistanciaProd(_lat1: number, _lon1: number, _lat2: number, _lon2: number) {
+    var deg2rad = 0.017453292519943295; // Math.PI / 180
+    var cos = Math.cos;    
+
+    _lat1 *= deg2rad;
+    _lon1 *= deg2rad;
+    _lat2 *= deg2rad;
+    _lon2 *= deg2rad;
+
+    var diam = 12742; // Diâmetro da terra em km
+    var dLat = _lat2 - _lat1;
+    var dLon = _lon2 - _lon1;
+    var a = ((1 - cos(dLat)) + 
+             (1 - cos(dLon)) * cos(_lat1) * cos(_lat2)) / 2;
+
+    this.distanciaProd = parseInt((diam * Math.asin(Math.sqrt(a)) * 1000).toFixed(0));
+    
+    return this.distanciaProd;
+  }
+
+  private checkBluetooth() {
+    this.ibeacon.isBluetoothEnabled()
+    .then(isEnabled => {
+      if (!isEnabled) {        
+        this.ibeacon.enableBluetooth();
+      }
+    });
+  }
+
+  private NoCelularInsonia() {
+    this.insomnia.keepAwake()
+    .then(() => {
+      console.log('Impedindo que a tela do dispositivo móvel adormeça');
+    });
+  }
 }
 
