@@ -29,10 +29,11 @@ export class HomePage {
   private pesoProd: string;
   private longProd: string;
   private latProd: string;
-  private textoTraduzido: string = "";    
+  private textoTraduzido: string = "";   
+  private textoConfirmacao: string = ""; 
   private idBeacon: string = "";
   private readonly database_name: string = "TCC.db"; 
-  private readonly table_name: string = "produtos"; 
+  private readonly table_name: string = "produto"; 
 
   // Variaveis do tipo NUMBER
   private rssi: number;  
@@ -98,7 +99,7 @@ export class HomePage {
 
   public PesquisaProd() {  
     if (this.network.type != 'none') {      
-      this.continuaProd = true;
+      this.continuaProd = true;      
       this.checkNFC();        
     } else {
       this.playVoz('Não será possível consultar o produto, pois não possui conexão com a internet!');
@@ -130,6 +131,7 @@ export class HomePage {
           this.informacaoProduto(tagContent);
         } else {
           this.playVoz('A etiqueta, não possui nenhuma informação!');
+          this.controlerCarregamento('A etiqueta não possui nenhuma informação...', 3000);
         }
       }
     });
@@ -162,13 +164,13 @@ export class HomePage {
   private askToTurnOnGPS(_opcao: number) {    
     this.locationAccuracy.request(this.locationAccuracy.REQUEST_PRIORITY_HIGH_ACCURACY)
     .then(() => {      
-      if (_opcao == 2) {                 
+      if (_opcao == 2) {                        
         this.playVoz('Por favor informe o produto que deseja encontrar!');
         this.controlerCarregamento('Por favor informe o produto que deseja encontrar...', 3000);
         setTimeout(() => { this.startVoz() }, 3010); 
       }                    
     }).catch(() => {         
-      this.playVoz('Erro ao solicitar permissão de localização!');
+      this.playVoz('Erro ao solicitar permissão de localização!');      
     });
   }
 
@@ -272,12 +274,8 @@ export class HomePage {
     this.databaseObj.executeSql("SELECT COUNT(*) AS qtd FROM " + this.table_name, []) 
     .then((res) => {      
       if (res.rows.item(0).qtd == 0) {
-        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '1', 'Uva Verde', 'Doce Mel', '2020-10-20', 7.49, '500 gramas', '-10.719707', '-62.248589'])
-        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '2', 'Feijão Preto', 'Carioca', '2021-08-10', 8.99, '1 quilo', '-10.719707', '-62.248589'])
-        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '3', 'Arroz Integral', 'Tio Urbano', '2022-03-02', 14.39, '5 quilos', '-10.719707', '-62.248589'])
-        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '4', 'Leite Integral', 'Italac', '2019-12-04', 2.59, '1 litro', '-10.719707', '-62.248589'])
-        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '5', 'Café Tradicional', 'Três Corações', '2021-06-30', 7.99, '500 gramas', '-10.719707', '-62.248589'])
-        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '6', 'Trigo Tradicional', 'Dona Benta', '2022-11-25', 8.99, '1 quilo', '-10.719707', '-62.248589'])
+        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '1', 'Leite Integral', 'Italac', '2019-12-25', 2.59, '1 litro', '-10.882565', '-61.96869'])        
+        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '2', 'Farinha de Trigo', 'Anaconda', '2020-01-22', 5.99, '1 quilo', '-10.882565', '-61.96869'])
         .then(() => {          
           console.log('Registros inseridos!');
         }).catch(e => {
@@ -303,8 +301,8 @@ export class HomePage {
           this.longProd = res.rows.item(i).longitude;
           this.latProd = res.rows.item(i).latitude;
           if (this.prodInfo) {   
-            this.playVoz('Aguarde, localizando a seção do produto!');
-            this.controlerCarregamento('Aguarde localizando a seção do produto...', 3500);               
+            this.playVoz('Aguarde, localizando o local do produto!');
+            this.controlerCarregamento('Aguarde localizando o local do produto...', 3500);               
             this.rotaSecao();
           }
         }
@@ -335,23 +333,49 @@ export class HomePage {
         this.prodInfo = false;
         this.continuaProd = false;
       } else {
-        this.playVoz('Esta etiqueta lida, não é o produto que foi informado!');
-        this.controlerCarregamento('Esta etiqueta lida, não é o produto que foi informado!', 4000); 
+        this.playVoz('A etiqueta lida, não é o produto que foi informado!');
+        this.controlerCarregamento('A etiqueta lida, não é o produto que foi informado!', 4000); 
       }
     } else {
       this.getRows(_nomeProd);
-      this.controlerCarregamento('Informações do produto...', 16000);
-      this.playVoz('Etiqueta lida com sucesso!');
-      setTimeout(() => { this.playVoz('Informações do item: '+ 
-        'Produto: '+ this.nomeProd +', '+        
-        'Marca: '+ this.marcaProd +', '+
-        'Data de Validade: '+ this.dataValiProd +', '+
-        'Preço: '+ this.precoProd +', '+
-        'Peso: '+ this.pesoProd +'')
-      }, 2500);
-      this.prodInfo = false; 
-      this.continuaProd = false;
+      setTimeout(() => {
+        this.controlerCarregamento('Deseja saber as informações do produto ?', 12000);
+        this.playVoz('Etiqueta lida com sucesso. Produto identificado, é '+ this.nomeProd + '. Deseja saber as informações desse produto? Sim ou Não.');
+      }, 1000);
+
+      setTimeout(() => { this.ConfirmaInformacaoProdVoz() }, 12000);
     }
+  }
+  
+  private ConfirmaInformacaoProdVoz() {    
+    let options = {
+      language: 'pt-BR',
+      matches: 1,
+      prompt: 'Estou te ouvindo! :)',  
+      showPopup: true,                
+    }
+    
+    this.speechRecognition.startListening(options)
+    .subscribe(matches => {
+      if (matches && matches.length > 0) {
+        this.textoConfirmacao = matches[0];               
+        
+        if (this.textoConfirmacao == "sim") {
+          this.controlerCarregamento('Informações do produto...', 14000);
+          this.playVoz('Informações do item: '+ 
+            'Produto: '+ this.nomeProd +', '+        
+            'Marca: '+ this.marcaProd +', '+
+            'Data de Validade: '+ this.dataValiProd +'. '+
+            'Preço: '+ this.precoProd +', '+
+            'Peso: '+ this.pesoProd +'');
+    
+          this.prodInfo = false; 
+          this.continuaProd = false;
+        }
+      }
+    },(onerror) => {
+      console.log('error:', onerror);    
+    })
   }
 
   private rotaSecao() {
@@ -363,20 +387,20 @@ export class HomePage {
 
     setTimeout(() => {  
       if (this.idBeacon != "") {    
-        if (this.distanciaFinal > 2) { 
+        if (this.distanciaFinal > 6) { 
           this.vibration.vibrate(1000);              
-          this.playVoz('O produto se localiza na seção de grãos, aproximadamente a ' + this.distanciaFinal + ' metros de distância. Por favor siga até a seção de grãos!');  
-          this.controlerCarregamento('O produto se localiza na seção de grãos aproximadamente a ' + this.distanciaFinal + ' metros de distância. Por favor siga até a seção de grãos...', 10000); 
+          this.playVoz('O produto se localiza na sala 59, aproximadamente a ' + this.distanciaFinal + ' metros de distância. Por favor siga até a sala 59!');  
+          this.controlerCarregamento('O produto se localiza na sala 59 aproximadamente a ' + this.distanciaFinal + ' metros de distância. Por favor siga até a sala 59...', 10000); 
           
           setTimeout(() => {
             let idDistancia = setInterval( () => {            
               this.encontraSecao = false;
-              this.controlerCarregamento('Por favor dirigir-se até seção de grãos...', 4000);
+              this.controlerCarregamento('Por favor dirigir-se até a sala 59...', 4000);
               this.startBeacon();                               
             }, 4300);
 
             let idValida = setInterval( () => {                          
-              if (this.distanciaFinal <= 2) {
+              if (this.distanciaFinal <= 6) {
                 this.vibration.vibrate(1000); 
                 this.playVoz('Você já se encontra no local onde está o produto!'); 
                 this.encontraSecao = true;
@@ -391,8 +415,8 @@ export class HomePage {
           }, 10001);          
         } else {
           this.vibration.vibrate(1000); 
-          this.playVoz('O produto se localiza na seção de grãos. Você já se encontra no local onde está o produto!'); 
-          this.controlerCarregamento('O produto se localiza na seção de grãos. Você já se encontra no local onde está o produto...', 6000); 
+          this.playVoz('O produto se localiza na sala 59. Você já se encontra no local onde está o produto!'); 
+          this.controlerCarregamento('O produto se localiza na sala 59. Você já se encontra no local onde está o produto...', 6000); 
           setTimeout(() => {
             this.rotaProduto();
           }, 7000);
@@ -413,7 +437,9 @@ export class HomePage {
     setTimeout(() => { 
       if (this.idBeacon == "") {
         if (!this.encontraSecao) {
-          this.playVoz('Não foi possível obter as informações do local, onde se encontra o produto!');           
+          this.playVoz('Não foi possível obter as informações do local, onde se encontra o produto!');    
+          this.prodInfo = false;
+          this.continuaProd = false;       
         }                
       } else {                              
         this.calculaDistanciaBeacon(this.rssi);        
