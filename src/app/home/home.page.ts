@@ -33,7 +33,7 @@ export class HomePage {
   private textoConfirmacao: string = ""; 
   private idBeacon: string = "";
   private readonly database_name: string = "TCC.db"; 
-  private readonly table_name: string = "produto_teste_tres"; 
+  private readonly table_name: string = "produtos_tcc_final"; 
   //private readonly table_name: string = "produtos_tcc_final"; 
 
   // Variaveis do tipo NUMBER
@@ -277,11 +277,11 @@ export class HomePage {
     .then((res) => {      
       if (res.rows.item(0).qtd == 0) {
         this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '1', 'Uva Verde', 'Doce Mel', '2020-10-20', 7.49, '500 gramas', '-10.882254', '-61.968089'])
-        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '2', 'Feijão Preto', 'Carioca', '2021-08-10', 8.99, '1 quilo', '-10.882252', '-61.96809'])
-        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '3', 'Arroz Integral', 'Tio Urbano', '2022-03-02', 14.39, '5 quilos', '-10.88225', '-62.96809'])
-        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '1', 'Leite Integral', 'Italac', '2019-12-25', 2.59, '1 litro', '-10.882248', '-61.968083'])
-        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '5', 'Café Tradicional', 'Três Corações', '2021-06-30', 7.99, '500 gramas', '-10.882255', '-61.968089'])
-        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '2', 'Farinha de Trigo', 'Anaconda', '2020-01-22', 5.99, '1 quilo', '-10.882253', '-61.968089'])
+        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '2', 'Feijão Preto', 'Carioca', '2021-08-10', 8.99, '1 quilo', '-10.882254', '-61.968089'])
+        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '3', 'Arroz Integral', 'Tio Urbano', '2022-03-02', 14.39, '5 quilos', '-10.882254', '-61.968089'])
+        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '1', 'Leite Integral', 'Italac', '2019-12-25', 2.59, '1 litro', '-10.882254', '-61.968089'])
+        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '5', 'Café Tradicional', 'Três Corações', '2021-06-30', 7.99, '500 gramas', '-10.882254', '-61.968089'])
+        this.databaseObj.executeSql('INSERT INTO ' + this.table_name + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [null, '2', 'Farinha de Trigo', 'Anaconda', '2020-01-22', 5.99, '1 quilo', '-10.882254', '-61.968089'])
         .then(() => {          
           console.log('Registros inseridos!');
         }).catch(e => {
@@ -393,20 +393,20 @@ export class HomePage {
 
     setTimeout(() => {  
       if (this.idBeacon != "") {    
-        if (this.distanciaFinal > 4) { 
+        if (this.distanciaFinal > 6) { 
           this.vibration.vibrate(1000);              
-          this.playVoz('O produto se localiza no laboratório 2. Aproximadamente a ' + this.distanciaFinal + ' metros de distância. Por favor siga até o laboratório 2!');  
-          this.controlerCarregamento('O produto se localiza no laboratório II aproximadamente a ' + this.distanciaFinal + ' metros de distância. Por favor siga até o laboratório II...', 10000); 
+          this.playVoz('O produto se localiza no laboratório 1. Aproximadamente a ' + this.distanciaFinal + ' metros de distância. Por favor siga até o laboratório 1!');  
+          this.controlerCarregamento('O produto se localiza no laboratório I aproximadamente a ' + this.distanciaFinal + ' metros de distância. Por favor siga até o laboratório I...', 10000); 
           
           setTimeout(() => {
             let idDistancia = setInterval( () => {            
               this.encontraSecao = false;
-              this.controlerCarregamento('Por favor dirigir-se até o laboratório II...', 4000);
+              this.controlerCarregamento('Por favor dirigir-se até o laboratório I...', 4000);
               this.startConexaoBeacon();                               
             }, 4300);
 
             let idValida = setInterval( () => {                          
-              if (this.distanciaFinal <= 4) {
+              if (this.distanciaFinal <= 6) {
                 this.vibration.vibrate(1000); 
                 this.playVoz('Você já se encontra no local onde está o produto!'); 
                 this.encontraSecao = true;
@@ -420,8 +420,8 @@ export class HomePage {
           }, 10010);          
         } else {
           this.vibration.vibrate(1000); 
-          this.playVoz('O produto se localiza no laboratório 2. Você já se encontra no local onde está o produto!'); 
-          this.controlerCarregamento('O produto se localiza no laboratório II. Você já se encontra no local onde está o produto...', 6000);           
+          this.playVoz('O produto se localiza no laboratório 1. Você já se encontra no local onde está o produto!'); 
+          this.controlerCarregamento('O produto se localiza no laboratório I. Você já se encontra no local onde está o produto...', 6000);           
           setTimeout(() => {
             this.rotaProduto();
           }, 7000);
@@ -536,25 +536,6 @@ export class HomePage {
           this.vibration.vibrate(1000);         
           this.playVoz('Produto encontrado. O produto se localiza, aproximadamente a ' + this.distanciaProd + ' metros de distância!'); 
           this.controlerCarregamento('Produto encontrado, o produto se localiza aproximadamente a ' + this.distanciaProd + ' metros de distância...', 6000); 
-
-          /*
-          setTimeout(() => {
-            let idDistanciaProd = setInterval(() => { 
-              this.controlerCarregamento('Por favor dirigir-se até o produto...', 2500);           
-              this.localizarDispositivo();
-            }, 3000);
-
-            let idStopDistanciaProd = setInterval(() => {          
-              if (this.distanciaProd <= 3) {              
-                clearInterval(idDistanciaProd);
-                clearInterval(idStopDistanciaProd);
-                this.vibration.vibrate(1000); 
-                this.playVoz('O produto desejado se encontra em uma distância aproximadamente de ' + this.distanciaProd + ' metro de distância. Por favor aproxime seu celular até o produto!'); 
-                this.controlerCarregamento('O produto desejado se encontra em uma distância aproximadamente de ' + this.distanciaProd + ' metro de distância...', 6000);
-              }            
-            }, 3000);
-          }, 6001);
-          */
         }
       }
     }, 4000);
