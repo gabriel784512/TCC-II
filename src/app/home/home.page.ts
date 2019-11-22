@@ -33,8 +33,7 @@ export class HomePage {
   private textoConfirmacao: string = ""; 
   private idBeacon: string = "";
   private readonly database_name: string = "TCC.db"; 
-  private readonly table_name: string = "produtos_tcc_final"; 
-  //private readonly table_name: string = "produtos_tcc_final"; 
+  private readonly table_name: string = "produtos";  
 
   // Variaveis do tipo NUMBER
   private rssi: number;  
